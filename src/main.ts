@@ -12,6 +12,7 @@ import {
   DoubleSide,
   AmbientLight,
   DirectionalLight,
+  Color,
 } from "three";
 import { GUI } from "dat.gui";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
@@ -64,9 +65,14 @@ world.addBody(ground.body);
 
 const boxList: Box[] = [];
 const randScale = () => (-0.5 + Math.random()) * 10;
+
+const rand = (num: number) => Math.floor(Math.random() * num);
+const randColor = () => new Color(`hsl(${rand(30)}, ${rand(20) + 80}%, 50%)`);
+
 const weight = 1;
 for (let i = 0; i < 100; i++) {
   const options = {
+    color: randColor(),
     weight,
     position: {
       x: randScale(),
@@ -111,12 +117,13 @@ function createGround(size = 1000) {
  */
 function createBox(
   options = {
+    color: 0xff0000,
     weight: 50,
     position: { x: 0, y: 200, z: 0 },
     mass: 50,
   }
 ) {
-  const { weight, position, mass } = options;
+  const { color, weight, position, mass } = options;
 
   let body = new CANNON.Body({
     mass, // 重さ
@@ -127,7 +134,7 @@ function createBox(
   body.angularVelocity.set(Math.random(), Math.random(), 0); // 回転を加える
 
   let geometry = new BoxGeometry(weight, weight, weight);
-  let material = new MeshStandardMaterial({ color: 0xaa0000, roughness: 0.0 });
+  let material = new MeshStandardMaterial({ color, roughness: 0.0 });
 
   let mesh = new Mesh(geometry, material);
   mesh.position.set(position.x, position.y, position.z);
