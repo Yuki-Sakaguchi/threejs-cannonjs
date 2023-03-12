@@ -6,21 +6,90 @@ import {
   WebGLRenderer,
   PlaneGeometry,
   PerspectiveCamera,
+  OrthographicCamera,
   BoxGeometry,
-  MeshStandardMaterial,
   Mesh,
-  DoubleSide,
-  AmbientLight,
   DirectionalLight,
   Color,
+  NearestFilter,
+  RGBAFormat,
+  WebGLRenderTarget,
+  Clock,
+  ShaderMaterial,
+  Vector4,
 } from "three";
+
 import { GUI } from "dat.gui";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+
+import vertexShader from "./glsl/glsl.vert?raw";
+import fragmentShader from "./glsl/glsl.frag?raw";
+import shadowFragmentShader from "./glsl/shadow.frag?raw";
+
+let time = 0;
+let delta = 0;
+let clock = new Clock();
+clock.start();
+
+let intensity_0 = new Vector4(1, 0, 0, 0);
 
 type Box = {
   body: CANNON.Body;
   mesh: Mesh;
+  material: ShaderMaterial;
+  shadowMaterial: ShaderMaterial;
 };
+
+function createMaterial(color: string, vertexShader: any, fragmentShader: any) {
+  const uniforms = {
+    uTime: {
+      value: 0,
+    },
+    uColor: {
+      value: new Color(color),
+    },
+    uLightPos: {
+      value: light.position,
+    },
+    uDepthMap: {
+      value: light.shadow.map.texture,
+    },
+    uShadowCameraP: {
+      value: shadowCamera.projectionMatrix,
+    },
+    uShadowCameraV: {
+      value: shadowCamera.matrixWorldInverse,
+    },
+    uIntensity_0: {
+      value: intensity_0,
+    },
+  };
+
+  const material = new ShaderMaterial({
+    vertexShader,
+    fragmentShader,
+    uniforms,
+  });
+
+  const shadowMaterial = new ShaderMaterial({
+    vertexShader,
+    fragmentShader: shadowFragmentShader,
+    uniforms,
+  });
+
+  return { material, shadowMaterial };
+}
+
+function createObj(geometry: any, color: string) {
+  const { material, shadowMaterial } = createMaterial(
+    color,
+    vertexShader,
+    fragmentShader
+  );
+  const mesh = new Mesh(geometry, material);
+  scene.add(mesh);
+  return { mesh, material, shadowMaterial };
+}
 
 // let gui = new GUI();
 // let params = {
@@ -45,32 +114,52 @@ let camera = new PerspectiveCamera(
   1,
   10000
 );
-camera.position.set(5, 5, 5);
+camera.position.set(3, 3, 3).multiplyScalar(2);
+camera.lookAt(scene.position);
 
 let renderer = new WebGLRenderer({
   antialias: true,
   alpha: true,
 });
+renderer.setClearColor(0xe1e5ea);
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
 renderer.setSize(window.innerWidth, window.innerHeight);
-//@ts-ignore
-renderer.gammaOutput = true;
-renderer.shadowMap.enabled = true;
+renderer.setClearColor(0xf3f3f3, 1);
 document.body.appendChild(renderer.domElement);
 
-const ambient = new AmbientLight(0xffffff, 1.0);
-scene.add(ambient);
+const light = new DirectionalLight(0xffffff, 1);
+light.position.set(10, 15, 5);
+scene.add(light);
 
-const direction = new DirectionalLight(0xffffff, 1);
-direction.position.set(2, 2, 0);
-direction.castShadow = true;
-direction.shadow.mapSize.width = 2048;
-direction.shadow.mapSize.height = 2048;
-direction.shadow.camera.right = 12;
-direction.shadow.camera.left = -12;
-direction.shadow.camera.top = -12;
-direction.shadow.camera.bottom = 12;
+// シャドウカメラ
+const frustumSize = 80;
+const shadowCamera = (light.shadow.camera = new OrthographicCamera(
+  -frustumSize / 2,
+  frustumSize / 2,
+  frustumSize / 2,
+  -frustumSize / 2,
+  1,
+  frustumSize
+));
+scene.add(shadowCamera);
+light.shadow.camera.position.copy(light.position);
+light.shadow.camera.lookAt(scene.position);
 
-scene.add(direction);
+// 深度マップ
+light.shadow.mapSize.x = 2048;
+light.shadow.mapSize.y = 2048;
+
+const pars = {
+  minFilter: NearestFilter,
+  magFilter: NearestFilter,
+  format: RGBAFormat,
+};
+
+light.shadow.map = new WebGLRenderTarget(
+  light.shadow.mapSize.x,
+  light.shadow.mapSize.y,
+  pars
+);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.update();
@@ -83,7 +172,7 @@ const boxList: Box[] = [];
 const randScale = () => -0.5 + Math.random();
 
 const rand = (num: number) => Math.floor(Math.random() * num);
-const randColor = () => new Color(`hsl(${rand(30)}, ${rand(20) + 80}%, 50%)`);
+const randColor = () => `hsl(${rand(50) + 140}, 80%, 50%)`;
 
 const weight = 0.5;
 for (let i = 0; i < 100; i++) {
@@ -116,18 +205,17 @@ function createGround(size = 100) {
   body.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 
   const geometry = new PlaneGeometry(size, size);
-  const material = new MeshStandardMaterial({
-    color: 0x23372f,
-    roughness: 0.0,
-    side: DoubleSide,
-  });
+  const { material, shadowMaterial } = createMaterial(
+    "white", // "hsl(160, 85%, 25%)",
+    vertexShader,
+    fragmentShader
+  );
 
   const mesh = new Mesh(geometry, material);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0;
-  mesh.receiveShadow = true;
 
-  return { body, mesh };
+  return { body, mesh, material, shadowMaterial };
 }
 
 /**
@@ -135,7 +223,7 @@ function createGround(size = 100) {
  */
 function createBox(
   options = {
-    color: new Color(0xff0000),
+    color: `red`,
     weight: 50,
     position: { x: 0, y: 200, z: 0 },
     mass: 50,
@@ -151,28 +239,33 @@ function createBox(
 
   body.angularVelocity.set(Math.random(), Math.random(), 0); // 回転を加える
 
-  let geometry = new BoxGeometry(weight, weight, weight);
-  let material = new MeshStandardMaterial({ color, roughness: 0.0 });
-
-  let mesh = new Mesh(geometry, material);
-  mesh.receiveShadow = true;
-  mesh.castShadow = true;
+  const { mesh, material, shadowMaterial } = createObj(
+    new BoxGeometry(weight, weight, weight),
+    color
+  );
   mesh.position.set(position.x, position.y, position.z);
 
-  return { body, mesh };
+  return { mesh, body, material, shadowMaterial };
 }
 
 let fixedTimeStep = 1.0 / 60.0;
 let maxSubStep = 3;
 let lastTime: number;
 
-function animate(time: number) {
-  requestAnimationFrame(animate);
+function loop(t: number) {
+  delta = clock.getDelta();
+  time += delta;
+
+  // 深度カメラ更新
+  shadowCamera.position.copy(light.position);
+  shadowCamera.lookAt(scene.position);
 
   if (lastTime !== undefined) {
-    const dt = (time - lastTime) / 1000;
+    const dt = (t - lastTime) / 1000;
     world.step(fixedTimeStep, dt, maxSubStep);
   }
+
+  lastTime = t;
 
   // canonの情報をコピーしてmeshに反映することでcannonとthree.jsの疎通ができる
   for (const box of boxList) {
@@ -180,8 +273,23 @@ function animate(time: number) {
     box.mesh.quaternion.copy(box.body.quaternion as any);
   }
 
-  lastTime = time;
+  // 深度
+  ground.mesh.material = ground.shadowMaterial;
+  for (const box of boxList) {
+    box.mesh.material = box.shadowMaterial;
+  }
+  renderer.setRenderTarget(light.shadow.map);
+  renderer.render(scene, shadowCamera);
+
+  // 通常のレンダリング
+  ground.mesh.material = ground.material;
+  for (const box of boxList) {
+    box.mesh.material = box.material;
+  }
+  renderer.setRenderTarget(null);
   renderer.render(scene, camera);
+
+  requestAnimationFrame(loop);
 }
 
 function resize() {
@@ -196,5 +304,5 @@ function resize() {
 }
 
 window.addEventListener("resize", resize);
-animate(0);
+loop(0);
 resize();
