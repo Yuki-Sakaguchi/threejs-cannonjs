@@ -45,15 +45,31 @@ let camera = new PerspectiveCamera(
   1,
   10000
 );
-camera.position.set(20, 30, 30);
+camera.position.set(5, 5, 5);
 
-let renderer = new WebGLRenderer();
+let renderer = new WebGLRenderer({
+  antialias: true,
+  alpha: true,
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
+//@ts-ignore
+renderer.gammaOutput = true;
+renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 const ambient = new AmbientLight(0xffffff, 1.0);
 scene.add(ambient);
+
 const direction = new DirectionalLight(0xffffff, 1);
+direction.position.set(2, 2, 0);
+direction.castShadow = true;
+direction.shadow.mapSize.width = 2048;
+direction.shadow.mapSize.height = 2048;
+direction.shadow.camera.right = 12;
+direction.shadow.camera.left = -12;
+direction.shadow.camera.top = -12;
+direction.shadow.camera.bottom = 12;
+
 scene.add(direction);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -64,12 +80,12 @@ scene.add(ground.mesh);
 world.addBody(ground.body);
 
 const boxList: Box[] = [];
-const randScale = () => (-0.5 + Math.random()) * 10;
+const randScale = () => -0.5 + Math.random();
 
 const rand = (num: number) => Math.floor(Math.random() * num);
 const randColor = () => new Color(`hsl(${rand(30)}, ${rand(20) + 80}%, 50%)`);
 
-const weight = 1;
+const weight = 0.5;
 for (let i = 0; i < 100; i++) {
   const options = {
     color: randColor(),
@@ -89,7 +105,7 @@ for (let i = 0; i < 100; i++) {
 /**
  * 床を生成する
  */
-function createGround(size = 1000) {
+function createGround(size = 100) {
   const body = new CANNON.Body({
     mass: 0, // 0だと動かない剛体になる
   });
@@ -102,12 +118,14 @@ function createGround(size = 1000) {
   const geometry = new PlaneGeometry(size, size);
   const material = new MeshStandardMaterial({
     color: 0x23372f,
+    roughness: 0.0,
     side: DoubleSide,
   });
 
   const mesh = new Mesh(geometry, material);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = 0;
+  mesh.receiveShadow = true;
 
   return { body, mesh };
 }
@@ -117,7 +135,7 @@ function createGround(size = 1000) {
  */
 function createBox(
   options = {
-    color: 0xff0000,
+    color: new Color(0xff0000),
     weight: 50,
     position: { x: 0, y: 200, z: 0 },
     mass: 50,
@@ -137,6 +155,8 @@ function createBox(
   let material = new MeshStandardMaterial({ color, roughness: 0.0 });
 
   let mesh = new Mesh(geometry, material);
+  mesh.receiveShadow = true;
+  mesh.castShadow = true;
   mesh.position.set(position.x, position.y, position.z);
 
   return { body, mesh };
