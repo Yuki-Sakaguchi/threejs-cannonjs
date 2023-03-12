@@ -10,7 +10,6 @@ import {
   MeshBasicMaterial,
   Mesh,
   DoubleSide,
-  Vector3,
 } from "three";
 import { GUI } from "dat.gui";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
@@ -93,7 +92,7 @@ function createBox(
   let body = new CANNON.Body({
     mass, // 重さ
     position: new CANNON.Vec3(position.x, position.y, position.z), // m
-    shape: new CANNON.Box(new CANNON.Vec3(weight / 2, weight / 2, weight / 2)), // three.jsのSphereと同じもの
+    shape: new CANNON.Box(new CANNON.Vec3(weight / 2, weight / 2, weight / 2)), // three.jsのSphereと同じもの,meshのsizeはbodyのsizeの2倍にしてあげ流必要があるのでこっちを半分にした
   });
 
   body.angularVelocity.set(Math.random(), Math.random(), 0); // 回転を加える
@@ -120,7 +119,6 @@ function animate(time: number) {
   }
 
   // canonの情報をコピーしてmeshに反映することでcannonとthree.jsの疎通ができる
-  console.log(box.mesh.position);
   box.mesh.position.copy(box.body.position as any);
   box.mesh.quaternion.copy(box.body.quaternion as any);
 
