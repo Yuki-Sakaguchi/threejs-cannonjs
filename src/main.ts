@@ -26,6 +26,13 @@ import vertexShader from "./glsl/glsl.vert?raw";
 import fragmentShader from "./glsl/glsl.frag?raw";
 import shadowFragmentShader from "./glsl/shadow.frag?raw";
 
+type Box = {
+  body: CANNON.Body;
+  mesh: Mesh;
+  material: ShaderMaterial;
+  shadowMaterial: ShaderMaterial;
+};
+
 let time = 0;
 let delta = 0;
 let clock = new Clock();
@@ -33,12 +40,20 @@ clock.start();
 
 let intensity_0 = new Vector4(1, 0, 0, 0);
 
-type Box = {
-  body: CANNON.Body;
-  mesh: Mesh;
-  material: ShaderMaterial;
-  shadowMaterial: ShaderMaterial;
+let basePoint = 140;
+let gui = new GUI();
+let params = {
+  randomColor: false,
+  colorfull: false,
+  amount: 100,
 };
+gui.add(params, "randomColor");
+gui.add(params, "colorfull");
+gui.add(params, "amount", 1, 100);
+
+function rand(num: number) {
+  return Math.floor(Math.random() * num);
+}
 
 function createMaterial(color: string, vertexShader: any, fragmentShader: any) {
   const uniforms = {
@@ -90,18 +105,6 @@ function createObj(geometry: any, color: string) {
   scene.add(mesh);
   return { mesh, material, shadowMaterial };
 }
-
-// let gui = new GUI();
-// let params = {
-//   color: 0x00ff00,
-//   scale: 1.0,
-// };
-// gui
-//   .addColor(params, "color")
-//   .onChange(() => cube.material.color.set(params.color));
-// gui.add(params, "scale", 1.0, 4.0).onChange(() => {
-//   cube.scale.set(params.scale, params.scale, params.scale);
-// });
 
 let world = new CANNON.World();
 world.gravity.set(0, -9.82, 0);
@@ -169,26 +172,39 @@ scene.add(ground.mesh);
 world.addBody(ground.body);
 
 const boxList: Box[] = [];
-const randScale = () => -0.5 + Math.random();
 
-const rand = (num: number) => Math.floor(Math.random() * num);
-const randColor = () => `hsl(${rand(50) + 140}, 80%, 50%)`;
+function addObj() {
+  const randScale = () => -0.5 + Math.random();
 
-const weight = 0.5;
-for (let i = 0; i < 100; i++) {
-  const options = {
-    color: randColor(),
-    weight,
-    position: {
-      x: randScale(),
-      y: 10 + i * weight * 2,
-      z: randScale(),
-    },
-    mass: 100,
+  let basePoint = params.randomColor ? rand(360) : 140;
+
+  const randColor = () => {
+    // カラフルモード
+    if (params.colorfull) {
+      return `hsl(${rand(360)}, 80%, 50%)`;
+    }
+
+    // デフォルトカラー
+    return `hsl(${rand(50) + basePoint}, 80%, 50%)`;
   };
-  boxList[i] = createBox(options);
-  scene.add(boxList[i].mesh);
-  world.addBody(boxList[i].body);
+
+  const weight = 0.5;
+  for (let i = 0; i < params.amount; i++) {
+    const options = {
+      color: randColor(),
+      weight,
+      position: {
+        x: randScale(),
+        y: 10 + i * weight * 2,
+        z: randScale(),
+      },
+      mass: 100,
+    };
+    const box = createBox(options);
+    boxList.push(box);
+    scene.add(box.mesh);
+    world.addBody(box.body);
+  }
 }
 
 /**
@@ -306,3 +322,16 @@ function resize() {
 window.addEventListener("resize", resize);
 loop(0);
 resize();
+
+const button = document.createElement("button");
+button.addEventListener("click", () => {
+  addObj();
+});
+button.textContent = "追加";
+button.classList.add("button");
+
+const buttonWrapper = document.createElement("div");
+buttonWrapper.classList.add("button-wrapper");
+buttonWrapper.appendChild(button);
+
+document.body.appendChild(buttonWrapper);

@@ -12,3 +12,18 @@ body {
 canvas {
   vertical-align: bottom;
 }
+
+.button-wrapper {
+  position: fixed;
+  bottom: 30px;
+  left: 0;
+  right: 0;
+  margin: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.button {
+  width: 100px;
+}
+
