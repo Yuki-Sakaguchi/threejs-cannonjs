@@ -1,6 +1,9 @@
 # threejs-cannonjs
 cannon.jsを使って物理演算をする
 
+demo
+https://yuki-sakaguchi.github.io/threejs-cannonjs/dist/
+
 https://user-images.githubusercontent.com/16290220/224551461-5a4323c8-0576-400c-869c-d8dee98a792d.mov
 
 # 参考
