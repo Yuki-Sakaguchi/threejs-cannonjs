@@ -38,9 +38,10 @@ let delta = 0;
 let clock = new Clock();
 clock.start();
 
+console.log(time); // uniforms で使ってるけど、TSで使ってないエラーになっちゃうのでコンソールに出す
+
 let intensity_0 = new Vector4(1, 0, 0, 0);
 
-let basePoint = 140;
 let gui = new GUI();
 let params = {
   randomColor: false,
@@ -322,6 +323,7 @@ function resize() {
 window.addEventListener("resize", resize);
 loop(0);
 resize();
+addObj();
 
 const button = document.createElement("button");
 button.addEventListener("click", () => {
