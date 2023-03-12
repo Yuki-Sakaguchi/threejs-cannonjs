@@ -7,12 +7,19 @@ import {
   PlaneGeometry,
   PerspectiveCamera,
   BoxGeometry,
-  MeshBasicMaterial,
+  MeshStandardMaterial,
   Mesh,
   DoubleSide,
+  AmbientLight,
+  DirectionalLight,
 } from "three";
 import { GUI } from "dat.gui";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+
+type Box = {
+  body: CANNON.Body;
+  mesh: Mesh;
+};
 
 // let gui = new GUI();
 // let params = {
@@ -37,11 +44,16 @@ let camera = new PerspectiveCamera(
   1,
   10000
 );
-camera.position.set(200, 100, 200);
+camera.position.set(20, 30, 30);
 
 let renderer = new WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+
+const ambient = new AmbientLight(0xffffff, 1.0);
+scene.add(ambient);
+const direction = new DirectionalLight(0xffffff, 1);
+scene.add(direction);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.update();
@@ -50,9 +62,23 @@ const ground = createGround();
 scene.add(ground.mesh);
 world.addBody(ground.body);
 
-const box = createBox();
-scene.add(box.mesh);
-world.addBody(box.body);
+const boxList: Box[] = [];
+const randScale = () => (-0.5 + Math.random()) * 10;
+const weight = 1;
+for (let i = 0; i < 100; i++) {
+  const options = {
+    weight,
+    position: {
+      x: randScale(),
+      y: 10 + i * weight * 2,
+      z: randScale(),
+    },
+    mass: 100,
+  };
+  boxList[i] = createBox(options);
+  scene.add(boxList[i].mesh);
+  world.addBody(boxList[i].body);
+}
 
 /**
  * 床を生成する
@@ -68,7 +94,10 @@ function createGround(size = 1000) {
   body.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 
   const geometry = new PlaneGeometry(size, size);
-  const material = new MeshBasicMaterial({ color: 0x23372f, side: DoubleSide });
+  const material = new MeshStandardMaterial({
+    color: 0x23372f,
+    side: DoubleSide,
+  });
 
   const mesh = new Mesh(geometry, material);
   mesh.rotation.x = -Math.PI / 2;
@@ -98,7 +127,7 @@ function createBox(
   body.angularVelocity.set(Math.random(), Math.random(), 0); // 回転を加える
 
   let geometry = new BoxGeometry(weight, weight, weight);
-  let material = new MeshBasicMaterial({ color: 0xaa0000 });
+  let material = new MeshStandardMaterial({ color: 0xaa0000, roughness: 0.0 });
 
   let mesh = new Mesh(geometry, material);
   mesh.position.set(position.x, position.y, position.z);
@@ -119,8 +148,10 @@ function animate(time: number) {
   }
 
   // canonの情報をコピーしてmeshに反映することでcannonとthree.jsの疎通ができる
-  box.mesh.position.copy(box.body.position as any);
-  box.mesh.quaternion.copy(box.body.quaternion as any);
+  for (const box of boxList) {
+    box.mesh.position.copy(box.body.position as any);
+    box.mesh.quaternion.copy(box.body.quaternion as any);
+  }
 
   lastTime = time;
   renderer.render(scene, camera);
